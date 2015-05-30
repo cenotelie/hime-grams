@@ -1,0 +1,501 @@
+/**********************************************************************
+* Copyright (c) 2014 Laurent Wouters and others
+* This program is free software: you can redistribute it and/or modify
+* it under the terms of the GNU Lesser General Public License as
+* published by the Free Software Foundation, either version 3
+* of the License, or (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General
+* Public License along with this program.
+* If not, see <http://www.gnu.org/licenses/>.
+*
+* Contributors:
+*     Laurent Wouters - lwouters@xowl.org
+**********************************************************************/
+
+grammar Alf
+{
+	options
+	{
+		Axiom = "unit";
+		Separator = "SEPARATOR";
+	}
+	terminals
+	{
+		// 7.2 Line terminators
+		// NEW_LINE		-> U+000A ;
+		// We use the following rule to be more complete
+		NEW_LINE		-> U+000D /* CR */
+						|  U+000A /* LF */
+						|  U+000D U+000A /* CR LF */
+						|  U+0085 // Next line character
+						|  U+2028 // Line separator character
+						|  U+2029 ; //Paragraph separator character (U+2029)
+
+		// 7.4 White space
+		// WHITE_SPACE	-> ' ' | '\t' | '\f' ;
+		// We use the following rule to be more complete
+		WHITE_SPACE		-> uc{Zs} | U+0009 | U+000B | U+000C ;
+
+		// 7.5 Comments
+		COMMENT_LINE	-> '//' (.* - (.* NEW_LINE .*)) NEW_LINE ;
+		COMMENT_BLOCK	-> '/*' (.* - (.* '*/' .*)) '*/' ;
+		SEPARATOR		-> NEW_LINE | WHITE_SPACE | COMMENT_LINE | COMMENT_BLOCK;
+
+		DOCUMENTATION	-> '/**' (.* - (.* '*/' .*)) '*/' ;
+
+		// 7.6 Names
+		IDENTIFIER			-> [a-zA-Z_] [a-zA-Z0-9_]* ;
+		UNRESTRICTED_NAME	-> '\''  ( (. - ('\'' | '\\' | NEW_LINE))
+											| '\\' ('\'' | '"' | '\'' | '\\' | [bftn])
+										)+ '\'' ;
+		NAME				-> IDENTIFIER | UNRESTRICTED_NAME ;
+
+		//  7.8 Primitive Literals
+		LITERAL_BOOLEAN				-> 'true' | 'false' ;
+		LITERAL_DECIMAL				-> '0'
+									| [1-9] ('_'? [0-9])* ;
+		LITERAL_BINARY				-> '0' [bB] [01] ('_'? [01])* ;
+		LITERAL_HEXA				-> '0' [xX] [a-fA-F0-9] ('_'? [a-fA-F0-9])* ;
+		LITERAL_OCTAL				-> '0' [0-7] ('_'? [0-7])* ;
+		LITERAL_STRING				-> '"'  ( (. - ('"' | '\\' | NEW_LINE))
+											| '\\' ('\'' | '"' | '\'' | '\\' | [bftn])
+										)* '"' ;
+
+		// 9.2 Annotated statements
+		ANNOTATION		-> '//@' (.* - (.* NEW_LINE .*)) NEW_LINE ;
+
+		// 9.3 In-line statements
+		INLINE_CODE		-> '/*@' (.* - (.* '*/' .*)) '*/' ;
+	}
+	rules
+	{
+		// 8.2 Qualified names
+		type					-> type_name type_multiplicity ;
+		type_multiplicity		-> '[' ']' ;
+		type_name				-> qualified_name^ | 'any'^ ;
+		qualified_names			-> qualified_name (','! qualified_name)* ;
+		qualified_name			-> qname_colon^
+								|  qname_dot^
+								|  qname_simple^ ;
+		qname_colon				-> qname_part ('::'! qname_part)* ;
+		qname_dot				-> qname_part ('.'! qname_part)* ;
+		qname_simple			-> qname_part ;
+		qname_part				-> NAME qname_template ;
+		qname_template			-> (qname_template_pos^
+								|  qname_template_named^)? ;
+		qname_template_pos		-> '<'! qualified_name (','! qualified_name)* '>'! ;
+		qname_template_named	-> '<'! qname_template_part (','! qname_template_part)* '>'! ;
+		qname_template_part		-> NAME '=>' qualified_name ;
+
+		// 8.3 Primary expressions
+		exp_primary				-> exp_name^
+								|  exp_primary_not_name^ ;
+		exp_primary_not_name	-> exp_literal^
+								|  exp_this^
+								|  exp_parenthesis^
+								|  exp_property_access^
+								|  exp_invocation^
+								|  exp_instance_creation^
+								|  exp_link_operation^
+								|  exp_class_extent^
+								|  exp_seq_construction^
+								|  exp_seq_access^
+								|  exp_seq_operation^
+								|  exp_seq_reduction^
+								|  exp_seq_expansion^
+								|  exp_post_inc^
+								|  exp_post_dec^ ;
+		exp_name				-> qualified_name^ ;
+		// 8.3.2 Literal expressions
+		exp_literal				-> exp_literal_boolean^
+								|  exp_literal_natural^
+								|  exp_literal_unbounded^
+								|  exp_literal_string^ ;
+		exp_literal_boolean		-> LITERAL_BOOLEAN^ ;
+		exp_literal_natural		-> LITERAL_DECIMAL^
+								|  LITERAL_BINARY^
+								|  LITERAL_HEXA^
+								|  LITERAL_OCTAL^ ;
+		exp_literal_unbounded	-> '*'! ;
+		exp_literal_string		-> LITERAL_STRING^ ;
+		// 8.3.4 This expressions
+		exp_this				-> 'this'! ;
+		// 8.3.5 Parenthesized expressions
+		exp_parenthesis			-> '('! expression^ ')'! ;
+		// 8.3.6 Property access expressions
+		exp_property_access		-> exp_feature_reference^ ;
+		exp_feature_reference	-> exp_feature_target '.'! qname_part ;
+		exp_feature_target		-> qname_colon^
+								|  exp_primary_not_name^ ;
+		//8.3.7 Invocation expressions
+		exp_invocation			-> exp_invocation_target tuple ;
+		exp_invocation_target	-> exp_invocation_behavior^
+								|  exp_invocation_feature^
+								|  exp_invocation_super^ ;
+		// 8.3.9 Behavior invocation expressions
+		exp_invocation_behavior	-> qualified_name^ ;
+		// 8.3.10 Feature invocation expressions
+		exp_invocation_feature	-> exp_feature_reference^
+								|  'this'^ ;
+		// 8.3.11 Super invocation expressions
+		exp_invocation_super	-> 'super'! ('.'! qualified_name)? ;
+		// 8.3.12 Instance creation expressions
+		exp_instance_creation	-> 'new'! qualified_name tuple ;
+		// 8.3.13 Link operation expressions
+		exp_link_operation		-> qualified_name '.'! exp_link_op exp_link_tuple ;
+		exp_link_op				-> 'createLink'^ | 'destroyLink'^ | 'clearAssoc'^ ;
+		exp_link_tuple			-> tuple_positional^ | tuple_indexed^ ;
+		// 8.3.14 Class extent expressions
+		exp_class_extent		-> qualified_name '.'! 'allInstances'! '('! ')'! ;
+		// 8.3.15 Sequence construction expressions
+		exp_seq_construction	-> exp_null^
+								|  exp_seq_elements^ ;
+		exp_null				-> 'null'^ ;
+		exp_seq_elements		-> ('new'!)? type '{'! exp_seq_content '}'! ;
+		exp_seq_content			-> exp_seq_content_list^
+								|  exp_seq_content_range^ ;
+		exp_seq_content_list	-> ( exp_seq_element (','! exp_seq_element)* (','!)? )? ;
+		exp_seq_content_range	-> expression '..'! expression ;
+		exp_seq_element			-> expression^
+								|  exp_seq_init^ ;
+		exp_seq_init			-> ('new'!)? '{'! exp_seq_content '}'! ;
+		// 8.3.16 Sequence access expressions
+		exp_seq_access			-> exp_primary index;
+		// 8.3.17 Sequence operation expressions
+		exp_seq_operation		-> exp_seq_op_target '->'! qualified_name tuple ;
+		exp_seq_op_target		-> qualified_name^
+								|  exp_primary_not_name^ ;
+		// 8.3.18 Sequence reduction expressions
+		exp_seq_reduction		-> exp_seq_op_target '->'! 'reduce'! exp_seq_reduction_order qualified_name ;
+		exp_seq_reduction_order	-> 'ordered'? ;
+		// 8.3.19 Sequence expansion expressions
+		exp_seq_expansion		-> exp_seq_op_target '->'! exp_seq_expansion_op NAME '('! expression ')'! ;
+		exp_seq_expansion_op	-> ('select' | 'reject'
+								|  'collect' | 'iterate'
+								|  'forAll' | 'exists' | 'one'
+								|  'isUnique')^ ;
+		// 8.4 Incremend and decrement operations
+		exp_post_inc			-> exp_primary '++'! ;
+		exp_post_dec			-> exp_primary '--'! ;
+
+		// 8.5 Unary expressions
+		exp_unary				-> exp_unary_not_numeric^
+								|  exp_pre_inc^
+								|  exp_pre_dec^
+								|  exp_unary_numeric^ ;
+		exp_unary_not_numeric	-> exp_primary^
+								|  exp_unary_not^
+								|  exp_unary_bit_string^
+								|  exp_cast^
+								|  exp_isolation^ ;
+		exp_pre_inc				-> '++'! exp_unary ;
+		exp_pre_dec				-> '--'! exp_unary ;
+		exp_unary_not			-> '!'! exp_unary ;
+		exp_unary_bit_string	-> '~'! exp_unary ;
+		exp_unary_numeric		-> '+' exp_unary
+								|  '-' exp_unary ;
+		// 8.5.5 Cast expressions
+		exp_cast				-> '('! type_name ')'! exp_unary_not_numeric ;
+		// 8.5.6 Isolation expressions
+		exp_isolation			-> '$'! exp_unary ;
+
+		// 8.6 Binary expressions
+		exp_multiplicative		-> exp_unary^
+								|  exp_multiplicative '*'^ exp_unary
+								|  exp_multiplicative '/'^ exp_unary
+								|  exp_multiplicative '%'^ exp_unary ;
+		exp_additive			-> exp_multiplicative^
+								|  exp_additive '+'^ exp_multiplicative
+								|  exp_additive '-'^ exp_multiplicative ;
+		exp_shift				-> exp_additive^
+								|  exp_shift '<<'^ exp_additive
+								|  exp_shift '>>'^ exp_additive
+								|  exp_shift '>>>'^ exp_additive ;
+		exp_relational			-> exp_shift^
+								|  exp_shift '<'^ exp_shift
+								|  exp_shift '>'^ exp_shift
+								|  exp_shift '<='^ exp_shift
+								|  exp_shift '>='^ exp_shift ;
+		exp_classification		-> exp_relational^
+								|  exp_relational 'instanceof'^ qualified_name
+								|  exp_relational 'hastype'^ qualified_name ;
+		exp_equality			-> exp_classification^
+								|  exp_equality '=='^ exp_classification
+								|  exp_equality '!='^ exp_classification ;
+		exp_bitwise_and			-> exp_equality^
+								|  exp_bitwise_and '&'^ exp_equality ;
+		exp_bitwise_xor			-> exp_bitwise_and^
+								|  exp_bitwise_xor '^'^ exp_bitwise_and ;
+		exp_bitwise_or			-> exp_bitwise_xor^
+								|  exp_bitwise_or '|'^ exp_bitwise_xor ;
+		exp_boolean_and			-> exp_bitwise_or^
+								|  exp_boolean_and '&&'^ exp_bitwise_or ;
+		exp_boolean_or			-> exp_boolean_and^
+								|  exp_boolean_or '||'^ exp_boolean_and ;
+		// 8.7 Conditional test expressions
+		exp_conditional			-> exp_boolean_or^
+								|  exp_boolean_or '?'^ expression ':'! exp_conditional ;
+		// 8.8 Assignment expressions
+		exp_assignment			-> exp_lhs exp_assignment_op^ expression ;
+		exp_assignment_op		-> ('=' | '+=' | '-=' | '*=' | '%=' | '/=' | '&=' | '|=' | '^=' | '<<=' | '>>=' | '>>>=')^ ;
+		exp_lhs					-> exp_lhs_qname^
+								|  exp_lhs_feature^
+								|  '('!  exp_lhs^ ')'!  ;
+		exp_lhs_qname			-> qualified_name index? ;
+		exp_lhs_feature			-> exp_feature_reference index? ;
+		expression				-> exp_conditional^ | exp_assignment^ ;
+
+		// 8.3.8 Tuples
+		tuple					-> tuple_positional^
+								|  tuple_named^ ;
+		tuple_positional		-> '('! (expression         (','! expression        )*)? ')'! ;
+		tuple_named				-> '('!  tuple_part_named   (','! tuple_part_named  )*   ')'! ;
+		tuple_indexed			-> '('!  tuple_part_indexed (','! tuple_part_indexed)*   ')'! ;
+		tuple_part_named		-> NAME '=>'! expression ;
+		tuple_part_indexed		-> NAME index? '=>'! expression ;
+		index					-> '['! expression^ ']'! ;
+
+
+		// 9 Statements
+		block					-> '{'! statement* '}'! ;
+		statement				-> stmt_doc stmt_annotations stmt_instruction ;
+		stmt_doc				-> DOCUMENTATION? ;
+		stmt_annotations		-> ANNOTATION* ;
+		stmt_instruction		-> stmt_inline^
+								|  stmt_block^
+								|  stmt_empty^
+								|  stmt_local_declaration^
+								|  stmt_expression^
+								|  stmt_if^
+								|  stmt_switch^
+								|  stmt_while^
+								|  stmt_do^
+								|  stmt_for^
+								|  stmt_break^
+								|  stmt_return^
+								|  stmt_accept^
+								|  stmt_classify^ ;
+		// 9.3 In-line statements
+		stmt_inline				-> INLINE_CODE^ ;
+		// 9.4 Block statements
+		stmt_block				-> block^ ;
+		// 9.5 Empty statements
+		stmt_empty				-> ';'! ;
+		// 9.6 Local name declaration statements
+		stmt_local_declaration	-> stmt_local_name '='! stmt_local_init ';'! ;
+		stmt_local_name			-> 'let'! NAME ':'! type
+								|  type NAME ;
+		stmt_local_init			-> expression^
+								|  exp_seq_init^
+								|  exp_instance_init^ ;
+		exp_instance_init		-> 'new'! tuple ;
+		// 9.7 Expression statements
+		stmt_expression			-> expression^ ';'! ;
+		// 9.8 If statements
+		stmt_if					-> 'if'! stmt_if_clauses stmt_if_clause_final ;
+		stmt_if_clauses			-> stmt_if_clause_blocks ('else'! 'if'! stmt_if_clause_blocks)* ;
+		stmt_if_clause_blocks	-> stmt_if_clause_block ('or'! 'if'! stmt_if_clause_block)* ;
+		stmt_if_clause_block	-> '('! expression ')'! block ;
+		stmt_if_clause_final	-> ('else'! block)? ;
+		// 9.9 Switch statements
+		stmt_switch				-> 'switch'! '('! expression ')'! '{'! stmt_switch_clauses stmt_switch_default '}'! ;
+		stmt_switch_clauses		-> stmt_switch_clause* ;
+		stmt_switch_clause		-> stmt_switch_cases stmt_switch_content ;
+		stmt_switch_cases		-> ('case'! expression ':'!)+ ;
+		stmt_switch_content		-> statement+ ;
+		stmt_switch_default		-> ('default'! ':'! statement+)? ;
+		// 9.10 While statements
+		stmt_while				-> 'while'! '('! expression ')'! block ;
+		// 9.11 Do statements
+		stmt_do					-> 'do'! block 'while'! '('! expression ')'! ';'! ;
+		// 9.12 For statements
+		stmt_for				-> 'for'! '('! stmt_for_vars ')'! block ;
+		stmt_for_vars			-> stmt_for_var (','! stmt_for_var)* ;
+		stmt_for_var			-> stmt_for_var_in_collec^
+								|  stmt_for_var_in_range^
+								|  stmt_for_var_explicit^ ;
+		stmt_for_var_in_collec	-> NAME 'in'! expression ;
+		stmt_for_var_in_range	-> NAME 'in'! expression '..'! expression ;
+		stmt_for_var_explicit	-> type_name NAME ':'! expression ;
+		// 9.13 Break statements
+		stmt_break				-> 'break'! ';'! ;
+		// 9.14 Return statements
+		stmt_return				-> 'return'! expression? ';'! ;
+		// 9.15 Accept statements
+		stmt_accept				-> stmt_accept_simple^
+								|  stmt_accept_compound^ ;
+		stmt_accept_simple		-> stmt_accept_clause ';'! ;
+		stmt_accept_compound	-> stmt_accept_block ('or'! stmt_accept_block)* ;
+		stmt_accept_block		-> stmt_accept_clause block ;
+		stmt_accept_clause		-> 'accept'! '('! stmt_accept_clause_name qualified_names ')'! ;
+		stmt_accept_clause_name	-> (NAME ':'!)? ;
+		// 9.16 Classify statements
+		stmt_classify			-> 'classify'! expression stmt_class_clause ';'! ;
+		stmt_class_clause		-> stmt_class_from stmt_class_to?
+								|  stmt_class_all? stmt_class_to ;
+		stmt_class_from			-> 'from'! qualified_names ;
+		stmt_class_to			-> 'to'! qualified_names ;
+		stmt_class_all			-> 'from'! '*'! ;
+
+
+		// 10 Units
+		unit					-> unit_namespace unit_imports unit_element ;
+		unit_namespace			-> ('namespace'! qualified_name ';'!)? ;
+		unit_imports			-> unit_import* ;
+		unit_import				-> unit_import_visibility 'import'! unit_import_reference ';'! ;
+		unit_import_visibility	-> 'public'^ | 'private'^ ;
+		unit_import_reference	-> unit_import_ref_element^
+								|  unit_import_ref_package^ ;
+		unit_import_ref_element	-> qualified_name unit_import_alias ;
+		unit_import_alias		-> ('as'! NAME)? ;
+		unit_import_ref_package	-> qname_colon '::'! '*'!
+								|  qname_dot '.'! '*'!
+								|  qname_simple ('::'! | '.'!) '*'! ;
+		unit_element			-> package_definition^
+								|  classifier_definition^ ;
+
+		unit_elem_visibility	-> ('public'^ | 'private'^ | 'protected'^)? ;
+		unit_elem_doc			-> DOCUMENTATION? ;
+		unit_elem_annotations	-> unit_elem_annotation* ;
+		unit_elem_annotation	-> '@'! qualified_name tagged_values ;
+		tagged_values			-> ('('! ( qualified_names^ | tagged_value_list^) ')'!)?;
+		tagged_value_list		-> tagged_value (','! tagged_value)* ;
+		tagged_value			-> NAME '=>'! literal_value ;
+		literal_value			-> LITERAL_BOOLEAN
+								|  ('+' | '-')? LITERAL_DECIMAL
+								|  ('+' | '-')? LITERAL_BINARY
+								|  ('+' | '-')? LITERAL_HEXA
+								|  ('+' | '-')? LITERAL_OCTAL
+								|  '*'
+								|  LITERAL_STRING ;
+
+		// 10.3 Packages
+		package_definition		-> package_declaration '{'! package_elements '}'! ;
+		package_stub			-> package_declaration^ ';'! ;
+		package_declaration		-> unit_elem_doc unit_elem_annotations unit_elem_visibility 'package'! NAME ;
+		package_elements		-> package_element* ;
+		package_element			-> package_definition^
+								|  package_stub^
+								|  classifier_definition^
+								|  classifier_stub^ ;
+
+		// 10.4 Classifiers
+		classifier_definition	-> class_definition^
+								|  active_class_definition^
+								|  datatype_definition^
+								|  enum_definition^
+								|  association_definition^
+								|  signal_definition^
+								|  activity_definition^ ;
+		classifier_stub			-> class_stub^
+								|  active_class_stub^
+								|  datatype_stub^
+								|  enum_stub^
+								|  association_stub^
+								|  signal_stub^
+								|  activity_stub^ ;
+		classifier_abstract		-> 'abstract'? ;
+		classifier_signature	-> NAME classifier_parameters classifier_specialization ;
+		classifier_parameters	-> ( '<'! classifier_parameter (','! classifier_parameter)* '>'! )? ;
+		classifier_parameter	-> unit_elem_doc NAME classifier_specialization ;
+		classifier_specialization-> ( 'specializes'! qualified_name )? ;
+
+		// 10.4.2 Classes
+		class_definition		-> class_declaration '{'! class_members '}'! ;
+		class_stub				-> class_declaration^ ';'! ;
+		class_declaration		-> unit_elem_doc unit_elem_annotations unit_elem_visibility classifier_abstract 'class'! classifier_signature ;
+		
+		class_members			-> class_member* ;
+		class_member			-> classifier_definition^
+								|  classifier_stub^
+								|  feature_definition^
+								|  feature_stub^ ;
+
+		// 10.4.3 Active classes
+		active_class_definition	-> active_class_declaration '{'! active_class_members '}'! active_class_behavior ;
+		active_class_stub		-> active_class_declaration^ ';'! ;
+		active_class_declaration-> unit_elem_doc unit_elem_annotations unit_elem_visibility classifier_abstract 'active'! 'class'! classifier_signature ;
+		active_class_members	-> active_class_member* ;
+		active_class_member		-> class_member^
+								|  active_feature_definition^
+								|  active_feature_stub^ ;
+		active_class_behavior	-> ('do'! (block | NAME) )? ;
+
+		// 10.4.4 Datatypes
+		datatype_definition		-> datatype_declaration '{'! datatype_members '}'! ;
+		datatype_stub			-> datatype_declaration^ ';'! ;
+		datatype_declaration	-> unit_elem_doc unit_elem_annotations unit_elem_visibility classifier_abstract 'datatype'! classifier_signature ;
+		datatype_members		-> structured_member* ;
+		structured_member		-> property_definition^ ;
+
+		// 10.4.5 Associations
+		association_definition	-> association_declaration '{'! association_members '}'! ;
+		association_stub		-> association_declaration^ ';'! ;
+		association_declaration	-> unit_elem_doc unit_elem_annotations unit_elem_visibility classifier_abstract 'assoc'! classifier_signature ;
+		association_members		-> structured_member structured_member structured_member* ;
+
+		// 10.4.6 Enumerations
+		enum_definition			-> enum_declaration '{'! enum_members '}'! ;
+		enum_stub				-> enum_declaration^ ';'! ;
+		enum_declaration		-> unit_elem_doc unit_elem_annotations unit_elem_visibility 'enum'! NAME classifier_specialization ;
+		enum_members			-> enum_member (','! enum_member)* ;
+		enum_member				-> unit_elem_doc NAME ;
+
+		// 10.4.7 Signals
+		signal_definition		-> signal_declaration '{'! signal_members '}'! ;
+		signal_stub				-> signal_declaration^ ';'! ;
+		signal_declaration		-> unit_elem_doc unit_elem_annotations unit_elem_visibility classifier_abstract 'signal'! classifier_signature ;
+		signal_members			-> structured_member* ;
+
+		// 10.4.8 Activities
+		activity_definition		-> activity_declaration block ;
+		activity_stub			-> activity_declaration^ ';'! ;
+		activity_declaration	-> unit_elem_doc unit_elem_annotations unit_elem_visibility 'activity'! NAME classifier_parameters operation_parameters operation_return ;
+
+		//10.5 Features
+		feature_definition		-> attribute_definition^
+								|  operation_definition^ ;
+		feature_stub			-> operation_stub^ ;
+		active_feature_definition-> reception_definition^
+								|  signal_reception_definition^ ;
+		active_feature_stub		-> signal_reception_stub^ ;
+
+		// 10.5.2 Properties
+		property_definition		-> property_declaration ';'! ;
+		property_declaration	-> unit_elem_doc unit_elem_annotations unit_elem_visibility NAME ':'! property_compose type_part ;
+		property_compose		-> 'compose'? ;
+		attribute_definition	-> property_declaration attribute_init ';'! ;
+		attribute_init			-> ('='! stmt_local_init)? ;
+
+		type_part				-> type_name type_multiplicity ;
+		type_multiplicity		-> ( type_multi_range type_multi_attributes )? ;
+		type_multi_range		-> '['! ( (LITERAL_DECIMAL '..'!)? (LITERAL_DECIMAL | '*') )? ']'! ;
+		type_multi_attributes	-> (  'ordered' 'nonunique'?
+									| 'nonunique' 'ordered'?
+									| 'sequence' )? ;
+
+		// 10.5.3 Operations
+		operation_definition	-> operation_declaration block ;
+		operation_stub			-> operation_declaration^ ';'! ;
+		operation_declaration	-> unit_elem_doc unit_elem_annotations unit_elem_visibility classifier_abstract NAME operation_parameters operation_return operation_redefines ;
+		operation_parameters	-> '('! (operation_parameter (','! operation_parameter)*)? ')'! ;
+		operation_parameter		-> unit_elem_doc unit_elem_annotations operation_parameter_dir NAME ':'! type_part ;
+		operation_parameter_dir	-> 'in'^ | 'out'^ | 'input'^ ;
+		operation_return		-> (':'! type_part)? ;
+		operation_redefines		-> ('redefines' qualified_name)? ;
+
+		// 10.5.4 Receptions
+		reception_definition			-> unit_elem_doc unit_elem_annotations unit_elem_visibility 'receive'! qualified_name ';'! ;
+		signal_reception_definition		-> signal_reception_declaration '{'! signal_reception_members '}'! ;
+		signal_reception_stub			-> signal_reception_declaration^ ';'! ;
+		signal_reception_declaration	-> unit_elem_doc unit_elem_annotations unit_elem_visibility 'receive'! 'signal'! NAME classifier_specialization ;
+		signal_reception_members		-> signal_reception_member* ;
+		signal_reception_member			-> structured_member^ ;
+	}
+}

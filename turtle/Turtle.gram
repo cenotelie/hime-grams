@@ -1,0 +1,136 @@
+/**********************************************************************
+* Copyright (c) 2014 Laurent Wouters and others
+* This program is free software: you can redistribute it and/or modify
+* it under the terms of the GNU Lesser General Public License as
+* published by the Free Software Foundation, either version 3
+* of the License, or (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General
+* Public License along with this program.
+* If not, see <http://www.gnu.org/licenses/>.
+*
+* Contributors:
+*     Laurent Wouters - lwouters@xowl.org
+**********************************************************************/
+
+grammar Turtle
+{
+	options
+	{
+		Axiom = "turtleDoc";
+		Separator = "BLANK";
+	}
+	terminals
+	{
+		NEW_LINE		-> U+000D /* CR */
+						|  U+000A /* LF */
+						|  U+000D U+000A /* CR LF */
+						|  U+2028 /* LS */
+						|  U+2029 /* PS */ ;
+		WHITE_SPACE		-> U+0020 | U+0009 | U+000B | U+000C ;
+		COMMENT			-> '#' (.* - (.* NEW_LINE .*)) NEW_LINE ;
+		BLANK			-> NEW_LINE | WHITE_SPACE | COMMENT ;
+		
+		LANGTAG					-> '@' [a-zA-Z]+ ('-' [a-zA-Z0-9]+)* ;
+		
+		IRIREF					-> '<' (
+									. - (U+0000 .. U+0020 | [<>"{}|^`\\])
+									| '\\u' [a-fA-F0-9]{4}
+									| '\\U' [a-fA-F0-9]{8}
+								)* '>' ;
+		
+		PLX						-> '%' [a-fA-F0-9] [a-fA-F0-9]
+								|  '\\' ( [_~.!$&'()*+,;=/?#@%] | '-') ;
+		
+		PN_CHARS_BASE			-> [A-Za-z] | U+00C0 .. U+00D6 | U+00D8 .. U+00F6 | U+00F8 .. U+02FF | U+0370 .. U+037D
+											| U+037F .. U+1FFF | U+200C .. U+200D | U+2070 .. U+218F | U+2C00 .. U+2FEF
+											| U+3001 .. U+D7FF | U+F900 .. U+FDCF | U+FDF0 .. U+FFFD
+											| U+10000 .. U+EFFFF ;
+		PN_CHARS_U				-> PN_CHARS_BASE | '_' | ':' ;
+		PN_CHARS				-> PN_CHARS_U | '-' | [0-9] | U+00B7 | U+0300 .. U+036F | U+203F .. U+2040;
+		PN_PREFIX				-> PN_CHARS_BASE ((PN_CHARS | '.')* PN_CHARS)? ;
+		PN_LOCAL				-> (PN_CHARS_U | ':' | [0-9] | PLX) ((PN_CHARS | '.' | ':' | PLX)* (PN_CHARS | ':' | PLX))? ;
+		
+		PNAME_NS				-> PN_PREFIX? ':' ;
+		PNAME_LN				-> PNAME_NS PN_LOCAL ;
+		BLANK_NODE_LABEL		-> '_:' (PN_CHARS_U | [0-9]) ((PN_CHARS | '.')* PN_CHARS)? ;
+		
+		ANON					-> '[' WHITE_SPACE* ']' ;
+		
+		INTEGER					-> ('+' | '-')? [0-9]+ ;
+		DECIMAL					-> ('+' | '-')? [0-9]* '.' [0-9]+ ;
+		DOUBLE					-> ('+' | '-')? ( [0-9]+ '.' [0-9]* [eE] ('+' | '-')? [0-9]+
+												| '.' [0-9]+ [eE] ('+' | '-')? [0-9]+
+												| [0-9]+ [eE] ('+' | '-')? [0-9]+
+												) ;
+		
+		STRING_LITERAL_QUOTE		-> '"' (
+									. - (U+0022 | U+005C | U+000A | U+000D)
+									| '\\' ([tbnrf"'] | '\\')
+									| '\\u' [a-fA-F0-9]{4}
+									| '\\U' [a-fA-F0-9]{8}
+									)* '"' ;
+		STRING_LITERAL_SINGLE_QUOTE	-> '\'' (
+									. - (U+0027 | U+005C | U+000A | U+000D)
+									| '\\' ([tbnrf"'] | '\\')
+									| '\\u' [a-fA-F0-9]{4}
+									| '\\U' [a-fA-F0-9]{8}
+									)* '\'' ;
+		STRING_LITERAL_LONG_SINGLE_QUOTE -> '\'\'\'' (
+											('\'' | '\'\'')?
+												(
+													[^'\\]
+													| '\\' ([tbnrf"'] | '\\')
+													| '\\u' [a-fA-F0-9]{4}
+													| '\\U' [a-fA-F0-9]{8}
+												)
+											)* '\'\'\'' ;
+		STRING_LITERAL_LONG_QUOTE		-> '"""' (
+											('"' | '""')?
+												(
+													[^"\\]
+													| '\\' ([tbnrf"'] | '\\')
+													| '\\u' [a-fA-F0-9]{4}
+													| '\\U' [a-fA-F0-9]{8}
+												)
+											)* '"""' ;
+		
+		PREFIX		-> [Pp] [Rr] [Ee] [Ff] [Ii] [Xx] ;
+		BASE		-> [Bb] [Aa] [Ss] [Ee] ;
+	}
+	rules
+	{
+		turtleDoc				-> 	statement* ;
+		statement				-> 	directive^ | triples^ '.'! ;
+		
+		directive				-> 	prefixID^ | base^ | sparqlPrefix^ | sparqlBase^ ;
+		prefixID				-> 	'@prefix'! PNAME_NS IRIREF '.'! ;
+		base					-> 	'@base'! IRIREF '.'! ;
+		sparqlBase				-> 	BASE! IRIREF ;
+		sparqlPrefix			-> 	PREFIX! PNAME_NS IRIREF ;
+		
+		triples					-> 	subject predicateObjectList | blankNodePropertyList predicateObjectList? ;
+		predicateObjectList 	-> 	verb objectList (';'! (verb objectList)?)* ;
+		objectList				-> 	object (','! object)* ;
+		verb					-> 	predicate^ | 'a'^ ;
+		subject					-> 	iri^ | blankNode^ | collection^ ;
+		predicate				-> 	iri^ ;
+		object					-> 	iri^ | blankNode^ | collection^ | blankNodePropertyList^ | literal^ ;
+		blankNodePropertyList	-> 	'['! predicateObjectList^ ']'! ;
+		collection				-> 	'('! object* ')'! ;
+		blankNode				-> 	BLANK_NODE_LABEL^ | ANON^ ;
+		
+		literal					-> 	rdfLiteral^ | numericLiteral^ | booleanLiteral^ ;
+		booleanLiteral			-> 	'true'^ | 'false'^ ;
+		numericLiteral			-> 	INTEGER^ | DECIMAL^ | DOUBLE^ ;
+		rdfLiteral				-> 	string (LANGTAG | '^^'! iri)? ;
+		string					-> 	STRING_LITERAL_QUOTE^ | STRING_LITERAL_SINGLE_QUOTE^ | STRING_LITERAL_LONG_SINGLE_QUOTE^ | STRING_LITERAL_LONG_QUOTE^ ;
+		iri						-> 	IRIREF^ | prefixedName^ ;
+		prefixedName			-> 	PNAME_LN^ | PNAME_NS^ ;
+	}
+}

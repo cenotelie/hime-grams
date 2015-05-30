@@ -1,0 +1,247 @@
+/**********************************************************************
+ * Copyright (c) 2014 Laurent Wouters and others
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General
+ * Public License along with this program.
+ * If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Contributors:
+ *     Laurent Wouters - lwouters@xowl.org
+ **********************************************************************/
+
+grammar FunctionalOWL2
+{
+	options
+	{
+		Axiom = "document";
+		Separator = "BLANK";
+	}
+	terminals
+	{
+		NEW_LINE		-> U+000D /* CR */
+						|  U+000A /* LF */
+						|  U+000D U+000A /* CR LF */
+						|  U+2028 /* LS */
+						|  U+2029 /* PS */ ;
+		WHITE_SPACE		-> U+0020 | U+0009 | U+000B | U+000C ;
+		COMMENT			-> '#' (.* - (.* NEW_LINE .*)) NEW_LINE ;
+		BLANK			-> NEW_LINE | WHITE_SPACE | COMMENT ;
+
+		LANGTAG					-> '@' [a-zA-Z]+ ('-' [a-zA-Z0-9]+)* ;
+
+		IRIREF					-> '<' (
+									. - (U+0000 .. U+0020 | [<>"{}|^`\\])
+									| '\\u' [a-fA-F0-9]{4}
+									| '\\U' [a-fA-F0-9]{8}
+								)* '>' ;
+
+		PLX						-> '%' [a-fA-F0-9] [a-fA-F0-9]
+								|  '\\' ( [_~.!$&'()*+,;=/?#@%] | '-') ;
+
+		PN_CHARS_BASE			-> [A-Za-z] | U+00C0 .. U+00D6 | U+00D8 .. U+00F6 | U+00F8 .. U+02FF | U+0370 .. U+037D
+											| U+037F .. U+1FFF | U+200C .. U+200D | U+2070 .. U+218F | U+2C00 .. U+2FEF
+											| U+3001 .. U+D7FF | U+F900 .. U+FDCF | U+FDF0 .. U+FFFD
+											| U+10000 .. U+EFFFF ;
+		PN_CHARS_U				-> PN_CHARS_BASE | '_' | ':' ;
+		PN_CHARS				-> PN_CHARS_U | '-' | [0-9] | U+00B7 | U+0300 .. U+036F | U+203F .. U+2040;
+		PN_PREFIX				-> PN_CHARS_BASE ((PN_CHARS | '.')* PN_CHARS)? ;
+		PN_LOCAL				-> (PN_CHARS_U | ':' | [0-9] | PLX) ((PN_CHARS | '.' | ':' | PLX)* (PN_CHARS | ':' | PLX))? ;
+
+		PNAME_NS				-> PN_PREFIX? ':' ;
+		PNAME_LN				-> PNAME_NS PN_LOCAL ;
+		BLANK_NODE_LABEL		-> '_:' (PN_CHARS_U | [0-9]) ((PN_CHARS | '.')* PN_CHARS)? ;
+
+		INTEGER					-> [0-9]+ ;
+		STRING					-> '"' (
+									. - (U+0022 | U+005C | U+000A | U+000D)
+									| '\\' ([tbnrf"'] | '\\')
+									| '\\u' [a-fA-F0-9]{4}
+									| '\\U' [a-fA-F0-9]{8}
+									)* '"' ;
+	}
+	rules
+	{
+		document        -> prefixes ontology ;
+		prefixes		-> prefix* ;
+		prefix			-> 'Prefix'! '('! PNAME_NS '='! IRIREF ')'! ;
+		ontology		-> 'Ontology'! '('! ontologyIRI imports annotations elements ')'! ;
+		ontologyIRI		-> iri? iri? ;
+		iri				-> IRIREF^ | PNAME_LN^ ;
+		imports			-> import* ;
+		import			-> 'Import'! '('! iri^ ')'! ;
+		elements		-> element* ;
+		element			-> axiom^ ;
+
+		annotations			-> annotation* ;
+		annotation			-> 'Annotation'! '('! annotations annotationProperty annotationValue ')'! ;
+		annotationSubject	-> entity^ | anonymousIndividual^ ;
+		annotationProperty	-> entity^ ;
+		annotationValue		-> entity^ | anonymousIndividual^ | literal^ ;
+
+		entity						-> iri^ ;
+		individual					-> anonymousIndividual^ | namedIndividual^ ;
+		namedIndividual				-> entity^ ;
+		anonymousIndividual			-> BLANK_NODE_LABEL^ ;
+		literal						-> literalTyped^ | literalString^ | literalLang^ ;
+		literalTyped				-> STRING '^^'! iri ;
+		literalString				-> STRING ;
+		literalLang					-> STRING LANGTAG ;
+
+		expObjectProperty			-> entity^ | expInverseObjectProperty^ ;
+		expObjectPropertyChain		-> 'ObjectPropertyChain'! '('! expObjectProperty expObjectProperty+ ')'! ;
+		expInverseObjectProperty	-> 'ObjectInverseOf'! '('! expObjectProperty ')'! ;
+		expDataProperty				-> entity^ ;
+		expDatarange				-> entity^
+									|  expDataIntersectionOf^
+									|  expDataUnionOf^
+									|  expDataComplementOf^
+									|  expDataOneOf^
+									|  expDatatypeRestriction^ ;
+		expDataIntersectionOf		-> 'DataIntersectionOf'! '('! expDatarange expDatarange+ ')'! ;
+		expDataUnionOf				-> 'DataUnionOf'! '('! expDatarange expDatarange+ ')'! ;
+		expDataComplementOf			-> 'DataComplementOf'! '('! expDatarange ')'! ;
+		expDataOneOf				-> 'DataOneOf'! '('! literal+ ')'! ;
+		expDatatypeRestriction		-> 'DatatypeRestriction'! '('! entity expRestriction+ ')'! ;
+		expRestriction				-> entity literal ;
+		expClass					-> entity^
+									|  expObjectInterfactionOf^
+									|  expObjectUnionOf^
+									|  expObjectComplementOf^
+									|  expObjectOneOf^
+									|  expObjectSomeValuesFrom^
+									|  expObjectAllValuesFrom^
+									|  expObjectHasValue^
+									|  expObjectHasSelf^
+									|  expObjectMinCardinality^
+									|  expObjectMaxCardinality^
+									|  expObjectExactCardinality^
+									|  expDataSomeValuesFrom^
+									|  expDataAllValuesFrom^
+									|  expDataHasValue^
+									|  expDataMinCardinality^
+									|  expDataMaxCardinality^
+									|  expDataExactCardinality^ ;
+		expObjectInterfactionOf		-> 'ObjectIntersectionOf'! '('! expClass expClass+ ')'! ;
+		expObjectUnionOf			-> 'ObjectUnionOf'! '('! expClass expClass+ ')'! ;
+		expObjectComplementOf		-> 'ObjectComplementOf'! '('! expClass ')'! ;
+		expObjectOneOf				-> 'ObjectOneOf'! '('! individual+ ')'! ;
+		expObjectSomeValuesFrom		-> 'ObjectSomeValuesFrom'! '('! expObjectProperty expClass ')'! ;
+		expObjectAllValuesFrom		-> 'ObjectAllValuesFrom'! '('! expObjectProperty expClass ')'! ;
+		expObjectHasValue			-> 'ObjectHasValue'! '('! expObjectProperty individual ')'! ;
+		expObjectHasSelf			-> 'ObjectHasSelf'! '('! expObjectProperty ')'! ;
+		expObjectMinCardinality		-> 'ObjectMinCardinality'! '('! INTEGER expObjectProperty expClass? ')'! ;
+		expObjectMaxCardinality		-> 'ObjectMaxCardinality'! '('! INTEGER expObjectProperty expClass? ')'! ;
+		expObjectExactCardinality	-> 'ObjectExactCardinality'! '('! INTEGER expObjectProperty expClass? ')'! ;
+		expDataSomeValuesFrom		-> 'DataSomeValuesFrom'! '('! expDataProperty+ expDatarange ')'! ;
+		expDataAllValuesFrom		-> 'DataAllValuesFrom'! '('! expDataProperty+ expDatarange ')'! ;
+		expDataHasValue				-> 'DataHasValue'! '('! expDataProperty literal ')'! ;
+		expDataMinCardinality		-> 'DataMinCardinality'! '('! INTEGER expDataProperty expDatarange? ')'! ;
+		expDataMaxCardinality		-> 'DataMaxCardinality'! '('! INTEGER expDataProperty expDatarange? ')'! ;
+		expDataExactCardinality		-> 'DataExactCardinality'! '('! INTEGER expDataProperty expDatarange? ')'! ;
+
+
+		axiom						-> axiomDeclaration^
+									|  axiomClass^
+									|  axiomObjectProperty^
+									|  axiomDataProperty^
+									|  axiomDatatype^
+									|  axiomHasKey^
+									|  axiomAssertion^
+									|  axiomAnnotation^ ;
+
+		axiomDeclaration			-> 'Declaration'! '('! annotations 'Class' '('! entity ')'! ')'!
+									|  'Declaration'! '('! annotations 'Datatype' '('! entity ')'! ')'!
+									|  'Declaration'! '('! annotations 'ObjectProperty' '('! entity ')'! ')'!
+									|  'Declaration'! '('! annotations 'DataProperty' '('! entity ')'! ')'!
+									|  'Declaration'! '('! annotations 'AnnotationProperty' '('! entity ')'! ')'!
+									|  'Declaration'! '('! annotations 'NamedIndividual' '('! entity ')'! ')'! ;
+
+		axiomClass					-> axiomSubClassOf^
+									|  axiomEquivalentClasses^
+									|  axiomDisjointClasses^
+									|  axiomDisjointUnion^ ;
+		axiomSubClassOf				-> 'SubClassOf'! '('! annotations expClass expClass ')'! ;
+		axiomEquivalentClasses		-> 'EquivalentClasses'! '('! annotations expClass expClass+ ')'! ;
+		axiomDisjointClasses		-> 'DisjointClasses'! '('! annotations expClass expClass+ ')'! ;
+		axiomDisjointUnion			-> 'DisjointUnion'! '('! annotations entity expClass expClass+ ')'! ;
+
+		axiomObjectProperty			-> axiomSubOjectPropertyOf^
+									|  axiomEquivalentObjectProperties^
+									|  axiomDisjointObjectProperties^
+									|  axiomInverseObjectProperties^
+									|  axiomObjectPropertyDomain^
+									|  axiomObjectPropertyRange^
+									|  axiomFunctionalObjectProperty^
+									|  axiomInverseFunctionalObjectProperty^
+									|  axiomReflexiveObjectProperty^
+									|  axiomIrreflexiveObjectProperty^
+									|  axiomSymmetricObjectProperty^
+									|  axiomAsymmetricObjectProperty^
+									|  axiomTransitiveObjectProperty^ ;
+		axiomSubOjectPropertyOf		-> 'SubObjectPropertyOf'! '('! annotations (expObjectProperty | expObjectPropertyChain) expObjectProperty ')'! ;
+		axiomEquivalentObjectProperties	-> 'EquivalentObjectProperties'! '('! annotations expObjectProperty expObjectProperty+ ')'! ;
+		axiomDisjointObjectProperties	-> 'DisjointObjectProperties'! '('! annotations expObjectProperty expObjectProperty+ ')'! ;
+		axiomInverseObjectProperties	-> 'InverseObjectProperties'! '('! annotations expObjectProperty expObjectProperty ')'! ;
+		axiomObjectPropertyDomain		-> 'ObjectPropertyDomain'! '('! annotations expObjectProperty expClass ')'! ;
+		axiomObjectPropertyRange		-> 'ObjectPropertyRange'! '('! annotations expObjectProperty expClass ')'! ;
+		axiomFunctionalObjectProperty	-> 'FunctionalObjectProperty'! '('! annotations expObjectProperty ')'! ;
+		axiomInverseFunctionalObjectProperty -> 'InverseFunctionalObjectProperty'! '('! annotations expObjectProperty ')'! ;
+		axiomReflexiveObjectProperty	-> 'ReflexiveObjectProperty'! '('! annotations expObjectProperty ')'! ;
+		axiomIrreflexiveObjectProperty	-> 'IrreflexiveObjectProperty'! '('! annotations expObjectProperty ')'! ;
+		axiomSymmetricObjectProperty	-> 'SymmetricObjectProperty'! '('! annotations expObjectProperty ')'! ;
+		axiomAsymmetricObjectProperty	-> 'AsymmetricObjectProperty'! '('! annotations expObjectProperty ')'! ;
+		axiomTransitiveObjectProperty	-> 'TransitiveObjectProperty'! '('! annotations expObjectProperty ')'! ;
+
+		axiomDataProperty			-> axiomSubDataPropertyOf^
+									|  axiomEquivalentDataProperties^
+									|  axiomDisjointDataProperties^
+									|  axiomDataPropertyDomain^
+									|  axiomDataPropertyRange^
+									|  axiomFunctionalDataProperty^ ;
+		axiomSubDataPropertyOf			-> 'SubDataPropertyOf'! '('! annotations expDataProperty expDataProperty ')'! ;
+		axiomEquivalentDataProperties	-> 'EquivalentDataProperties'! '('! annotations expDataProperty expDataProperty+ ')'! ;
+		axiomDisjointDataProperties		-> 'DisjointDataProperties'! '('! annotations expDataProperty expDataProperty+ ')'! ;
+		axiomDataPropertyDomain			-> 'DataPropertyDomain'! '('! annotations expDataProperty expClass ')'! ;
+		axiomDataPropertyRange			-> 'DataPropertyRange'! '('! annotations expDataProperty expDatarange ')'! ;
+		axiomFunctionalDataProperty		-> 'FunctionalDataProperty'! '('! annotations expDataProperty ')'! ;
+
+		axiomDatatype					-> 'DatatypeDefinition'! '('! annotations entity expDatarange ')'! ;
+
+		axiomHasKey						-> 'HasKey'! '('! annotations expClass axiomHasKeyObjectProperties axiomHasKeyDataProperties ')'! ;
+		axiomHasKeyObjectProperties		-> '('! expObjectProperty* ')'! ;
+		axiomHasKeyDataProperties		-> '('! expDataProperty* ')'! ;
+
+		axiomAssertion					-> axiomSameIndividual^
+										|  axiomDifferentIndividuals^
+										|  axiomClassAssertion^
+										|  axiomObjectPropertyAssertion^
+										|  axiomNegativeObjectPropertyAssertion^
+										|  axiomDataPropertyAssertion^
+										|  axiomNegativeDataPropertyAssertion^ ;
+		axiomSameIndividual					-> 'SameIndividual'! '('! annotations individual individual+ ')'! ;
+		axiomDifferentIndividuals			-> 'DifferentIndividuals'! '('! annotations individual individual+ ')'! ;
+		axiomClassAssertion					-> 'ClassAssertion'! '('! annotations expClass individual ')'! ;
+		axiomObjectPropertyAssertion		-> 'ObjectPropertyAssertion'! '('! annotations expObjectProperty individual individual ')'! ;
+		axiomNegativeObjectPropertyAssertion-> 'NegativeObjectPropertyAssertion'! '('! annotations expObjectProperty individual individual ')'! ;
+		axiomDataPropertyAssertion			-> 'DataPropertyAssertion'! '('! annotations expDataProperty individual literal ')'! ;
+		axiomNegativeDataPropertyAssertion	-> 'NegativeDataPropertyAssertion'! '('! annotations expDataProperty individual literal ')'! ;
+
+		axiomAnnotation					-> axiomAnnotationAssertion
+										|  axiomSubAnnotationPropertyOf
+										|  axiomAnnotationPropertyDomain
+										|  axiomAnnotationPropertyRange ;
+		axiomAnnotationAssertion		-> 'AnnotationAssertion'! '('! annotations annotationProperty annotationSubject annotationValue ')'! ;
+		axiomSubAnnotationPropertyOf	-> 'SubAnnotationPropertyOf'! '('! annotations annotationProperty annotationProperty ')'! ;
+		axiomAnnotationPropertyDomain	-> 'AnnotationPropertyDomain'! '('! annotations annotationProperty entity ')'! ;
+		axiomAnnotationPropertyRange	-> 'AnnotationPropertyRange'! '('! annotations annotationProperty entity ')'! ;
+	}
+}
