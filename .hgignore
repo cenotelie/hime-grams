@@ -1,0 +1,23 @@
+syntax: regexp
+
+# .Net build folders
+.*/bin/.*
+.*/obj/.*
+# Maven build folders
+.*/target/.*
+.*/out/.*
+.*\.class
+# Python binaries
+.*/__pycache__/.*
+.*\.pyc
+
+
+# Visual Studio / Mono
+.*\.suo
+.*\.userprefs
+# IntelliJ / PyCharm
+.*/.idea/.*
+.*\.iml
+
+# GEdit temp file
+.*~
