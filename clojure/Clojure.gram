@@ -1,0 +1,145 @@
+/**********************************************************************
+ * Copyright (c) 2015 Laurent Wouters
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General
+ * Public License along with this program.
+ * If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Contributors:
+ *     Laurent Wouters - lwouters@xowl.org
+ **********************************************************************/
+
+grammar Clojure
+{
+	options
+	{
+		Axiom = "document";
+		Separator = "BLANK";
+	}
+	terminals
+	{
+		NEW_LINE		-> U+000D /* CR */
+								|  U+000A /* LF */
+								|  U+000D U+000A /* CR LF */
+								|  U+2028 /* LS */
+								|  U+2029 /* PS */ ;
+		WHITE_SPACE		-> U+0020 | U+0009 | U+000B | U+000C ;
+		COMMENT			-> (';' | '#!') (.* - (.* NEW_LINE .*)) NEW_LINE ;
+		BLANK			-> NEW_LINE | WHITE_SPACE | COMMENT ;
+
+		fragment SYMBOL_CHAR_FIRST		-> . - ([0-9] | '^' | '`' | '\'' | '"' | '#' | '~' | '@' | ':' | '/' | '%' | '(' | ')' | '[' | ']' | '{' | '}'
+											| WHITE_SPACE
+											| NEW_LINE ) ;
+		fragment SYMBOL_CHAR			-> SYMBOL_CHAR_FIRST | [0-9] | '^' | '\'' | '#' | '~' | '@' | '%' ;
+		fragment SYMBOL_ELEM			-> SYMBOL_CHAR_FIRST SYMBOL_CHAR* (':' SYMBOL_CHAR+)* ;
+		CLJ_SYMBOL			-> '.' | '/' |  SYMBOL_ELEM ('/' SYMBOL_ELEM)? ;
+		CLJ_KEYWORD			-> ':' ':'? ((SYMBOL_CHAR_FIRST | [0-9]) SYMBOL_CHAR* (':' SYMBOL_CHAR+)*) ('/' ((SYMBOL_CHAR_FIRST | [0-9]) SYMBOL_CHAR* (':' SYMBOL_CHAR+)*))? ':'? ;
+		LITERAL_STRING		-> '"'  ( (. - ('"' | '\\'))
+											| '\\' ('\'' | '"' | '\\' | [btnfr])
+											| '\\' [0-7]
+											| '\\' [0-7] [0-7]
+											| '\\' [0-3] [0-7] [0-7]
+											| '\\' [u] [a-fA-F0-9] [a-fA-F0-9] [a-fA-F0-9] [a-fA-F0-9]
+										)* '"' ;
+		LITERAL_CHAR		-> '\\' ( (. - NEW_LINE)
+										| 'newline'
+										| 'space'
+										| 'tab'
+										| 'formfeed'
+										| 'backspace'
+										| 'return'
+										| 'o' [0-7]
+										| 'o' [0-7] [0-7]
+										| 'o' [0-3] [0-7] [0-7]
+										| [u] [a-fA-F0-9] [a-fA-F0-9] [a-fA-F0-9] [a-fA-F0-9]
+									) ;
+		LITERAL_NIL			-> 'nil' ;
+		LITERAL_TRUE		-> 'true' ;
+		LITERAL_FALSE		-> 'false' ;
+		LITERAL_INTEGER		-> ('+'|'-')?
+								( 	'0'
+									| [1-9] [0-9]*
+									| '0' [xX] [0-9A-Fa-f]+
+									| '0' [0-7]+
+									| [1-9] [0-9]? [rR] [0-9A-Za-z]+
+									| '0' [0-9]+
+								)
+								'N'? ;
+		LITERAL_RATIO		-> ('+'|'-')? [0-9]+ '/' [0-9]+ ;
+		LITERAL_FLOAT		-> ('+'|'-')? [0-9]+
+								( '.' [0-9]* )?
+								( [eE] ('+'|'-')? [0-9]+ )?
+								'M'? ;
+		LITERAL_ARGUMENT	-> '%' ([0-9]+ | '&')? ;
+		CLJ_LP				-> '(' ;
+		CLJ_RP				-> ')' ;
+		CLJ_LB				-> '[' ;
+		CLJ_RB				-> ']' ;
+		CLJ_LC				-> '{' ;
+		CLJ_RC				-> '}' ;
+		CLJ_DISPATCH		-> '#' ;
+		CLJ_SET_SEPARATOR	-> ',' ;
+		CLJ_QUOTE			-> '\'' ;
+		CLJ_DEREF			-> '@' ;
+		CLJ_METADATA		-> '^' ;
+		CLJ_IGNORE			-> '#_' ;
+		CLJ_SYNTAX_QUOTE	-> '`' ;
+		CLJ_UNQUOTE			-> '~' ;
+		CLJ_UNQUOTE_SPLICE	-> '~@' ;
+		CLJ_CONDITIONAL		-> '#?' '@'? ;
+	}
+	rules
+	{
+		atom				-> CLJ_SYMBOL^
+							|  CLJ_KEYWORD^
+							|  LITERAL_STRING^
+							|  LITERAL_CHAR^
+							|  LITERAL_NIL^
+							|  LITERAL_TRUE^
+							|  LITERAL_FALSE^
+							|  LITERAL_INTEGER^
+							|  LITERAL_FLOAT^
+							|  LITERAL_RATIO^
+							|  LITERAL_ARGUMENT^ ;
+		list				-> CLJ_LP! form* CLJ_RP! ;
+		vector				-> CLJ_LB! form* CLJ_RB! ;
+		map					-> CLJ_LC! (couple ((CLJ_SET_SEPARATOR!)? couple)*)? CLJ_RC! ;
+		couple				-> form form ;
+		set					-> CLJ_DISPATCH! CLJ_LC! form* CLJ_RC! ;
+		constructor			-> CLJ_DISPATCH! CLJ_SYMBOL (vector | map) ;
+		quote				-> CLJ_QUOTE! form ;
+		deref				-> CLJ_DEREF! form ;
+		metadata			-> CLJ_METADATA! map form
+							|  CLJ_METADATA! CLJ_SYMBOL form
+							|  CLJ_METADATA! CLJ_KEYWORD form
+							|  CLJ_METADATA! LITERAL_STRING form ;
+		regexp				-> CLJ_DISPATCH! LITERAL_STRING ;
+		var_quote			-> CLJ_DISPATCH! CLJ_QUOTE! form ;
+		anon_function		-> CLJ_DISPATCH! list ;
+		ignore				-> CLJ_IGNORE! form ;
+		syntax_quote		-> CLJ_SYNTAX_QUOTE! form ;
+		unquote				-> CLJ_UNQUOTE! form ;
+		unquote_splicing	-> CLJ_UNQUOTE_SPLICE! form ;
+		conditional			-> CLJ_CONDITIONAL! form ;
+
+		form				-> atom^
+							|  list^ | vector^ | map^ | set^
+							|  constructor^
+							|  quote^ | deref^ | metadata^
+							|  regexp^
+							|  var_quote^ | anon_function^ | ignore^
+							|  syntax_quote^ | unquote^ | unquote_splicing^
+							|  conditional^ ;
+
+		document			-> form* ;
+	}
+}

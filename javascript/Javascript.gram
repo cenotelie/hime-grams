@@ -18,21 +18,22 @@
 *     Laurent Wouters - lwouters@xowl.org
 **********************************************************************/
 
-grammar ECMAScript
+grammar Javascript
 {
 	options
 	{
 		Axiom = "program";
 		Separator = "Separator";
 	}
-	terminals {
+	terminals
+	{
 		LineTerminator  -> U+000D /* CR */
 						|  U+000A /* LF */
 						|  U+000D U+000A /* CR LF */
 						|  U+2028 /* LS */
 						|  U+2029 /* PS */ ;
 		
-		WhiteSpace  	-> U+0020 | U+0009 | U+000B | U+000C ; // U+0009 | \uc{Zs} ;
+		WhiteSpace  	-> U+0020 | U+0009 | U+000B | U+000C | U+00A0 | U+FEFF ;
 		CommentLine		-> '//' (.* - (.* LineTerminator .*)) LineTerminator ;
 		CommentBlock	-> '/*' (.* - (.* '*/' .*)) '*/' ;
 		
@@ -80,10 +81,14 @@ grammar ECMAScript
 									
 								)*
 								'/' (IdStart | [0-9])* ;
-		context prop_get { GET -> 'get'; }
-		context prop_set { SET -> 'set'; }
+		context accessors
+		{
+			GET -> 'get';
+			SET -> 'set';
+		}
 	}
-	rules {
+	rules
+	{
 		literal				-> 'null'
 							|  lit_boolean
 							|  lit_numeric
@@ -100,11 +105,9 @@ grammar ECMAScript
 		lit_object			-> '{' '}'
 							|  '{' properties ','? '}' ;
 		properties			-> prop_assign (',' prop_assign)* ;
-		prop_assign			-> prop_name ':' exp_assign
-							|  prop_get prop_name '(' ')' '{' function_body '}'
-							|  prop_set prop_name '(' prop_set_params ')' '{' function_body '}' ;
-		prop_get			-> GET^;
-		prop_set			-> SET^;
+		prop_assign			-> #accessors{ GET | SET | prop_name } ':' exp_assign
+							|  #accessors{ GET } prop_name '(' ')' '{' function_body '}'
+							|  #accessors{ SET } prop_name '(' prop_set_params ')' '{' function_body '}' ;
 		prop_name			-> Identifier | lit_string | lit_numeric ;
 		prop_set_params		-> Identifier ;
 		
