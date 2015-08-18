@@ -5,6 +5,7 @@ syntax: regexp
 .*/obj/.*
 # Maven build folders
 .*/target/.*
+target/*
 .*/out/.*
 .*\.class
 # Python binaries
