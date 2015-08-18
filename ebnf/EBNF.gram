@@ -64,13 +64,13 @@ grammar EBNF
 		
 		single_group	-> '('! expression^ ')'! ;
 		option_group	-> "optional"^ '['! expression ']'! ;
-		repeat_group	-> "repeated"^ '{'! expression '}'! ;
+		repeat_group	-> "repeat"^ '{'! expression '}'! ;
 		
 		repeated	-> atom^ ;
-		repeated	-> "repeated"^ atom '*'! ;
+		repeated	-> "repeat"^ atom '*'! ;
 		reduced		-> repeated^ ('-'^ repeated)* ;
-		fragment	-> reduced^ (','^ reduced)* ;
-		expression	-> fragment^ ('|'^ fragment)* ;
+		frag		-> reduced^ (','^ reduced)* ;
+		expression	-> frag^ ('|'^ frag)* ;
 		
 		ebnf_rule		-> IDENTIFIER '='! expression ';'! ;
 		ebnf_grammar	-> ebnf_rule* ;
