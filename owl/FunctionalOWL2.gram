@@ -44,17 +44,16 @@ grammar FunctionalOWL2
 									| '\\U' [a-fA-F0-9]{8}
 								)* '>' ;
 
-		PLX						-> '%' [a-fA-F0-9] [a-fA-F0-9]
+		fragment PLX			-> '%' [a-fA-F0-9] [a-fA-F0-9]
 								|  '\\' ( [_~.!$&'()*+,;=/?#@%] | '-') ;
-
-		PN_CHARS_BASE			-> [A-Za-z] | U+00C0 .. U+00D6 | U+00D8 .. U+00F6 | U+00F8 .. U+02FF | U+0370 .. U+037D
+		fragment PN_CHARS_BASE	-> [A-Za-z] | U+00C0 .. U+00D6 | U+00D8 .. U+00F6 | U+00F8 .. U+02FF | U+0370 .. U+037D
 											| U+037F .. U+1FFF | U+200C .. U+200D | U+2070 .. U+218F | U+2C00 .. U+2FEF
 											| U+3001 .. U+D7FF | U+F900 .. U+FDCF | U+FDF0 .. U+FFFD
 											| U+10000 .. U+EFFFF ;
-		PN_CHARS_U				-> PN_CHARS_BASE | '_' | ':' ;
-		PN_CHARS				-> PN_CHARS_U | '-' | [0-9] | U+00B7 | U+0300 .. U+036F | U+203F .. U+2040;
-		PN_PREFIX				-> PN_CHARS_BASE ((PN_CHARS | '.')* PN_CHARS)? ;
-		PN_LOCAL				-> (PN_CHARS_U | ':' | [0-9] | PLX) ((PN_CHARS | '.' | ':' | PLX)* (PN_CHARS | ':' | PLX))? ;
+		fragment PN_CHARS_U		-> PN_CHARS_BASE | '_' ;
+		fragment PN_CHARS		-> PN_CHARS_U | '-' | [0-9] | U+00B7 | U+0300 .. U+036F | U+203F .. U+2040;
+		fragment PN_PREFIX		-> PN_CHARS_BASE ((PN_CHARS | '.')* PN_CHARS)? ;
+		fragment PN_LOCAL		-> (PN_CHARS_U | ':' | [0-9] | PLX) ((PN_CHARS | '.' | ':' | PLX)* (PN_CHARS | ':' | PLX))? ;
 
 		PNAME_NS				-> PN_PREFIX? ':' ;
 		PNAME_LN				-> PNAME_NS PN_LOCAL ;

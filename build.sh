@@ -37,22 +37,6 @@ cp hime/tests/net/bin/Release/Tests.Executor.exe executor.exe
 rm -f expected.txt
 touch expected.txt
 
-# Testing EBNF
-echo -n "Testing grammar: EBNF ... "
-mono himecc.exe ../ebnf/EBNF.gram -o:assembly -a:public -n Hime.Grams >/dev/null
-mv EBNF.dll Parsers.dll
-cp ../ebnf/sample.txt input.txt
-mono executor.exe Hime.Grams.EBNFParser outputs
-echo "OK"
-
-# Testing Hime
-echo -n "Testing grammar: Hime ... "
-mono himecc.exe ../hime/Hime.gram -o:assembly -a:public -n Hime.Grams >/dev/null
-mv Hime.dll Parsers.dll
-cp ../hime/Hime.gram input.txt
-mono executor.exe Hime.Grams.HimeParser outputs
-echo "OK"
-
 # Testing Alf
 echo -n "Testing grammar: Alf ... "
 mono himecc.exe ../alf/Alf.gram -m:rnglr -o:assembly -a:public -n Hime.Grams >/dev/null
@@ -75,6 +59,30 @@ mono himecc.exe ../csharp/CSharp.gram -m:rnglr -o:assembly -a:public -n Hime.Gra
 mv CSharp.dll Parsers.dll
 cp ../csharp/sample.cs input.txt
 mono executor.exe Hime.Grams.CSharpParser outputs
+echo "OK"
+
+# Testing EBNF
+echo -n "Testing grammar: EBNF ... "
+mono himecc.exe ../ebnf/EBNF.gram -o:assembly -a:public -n Hime.Grams >/dev/null
+mv EBNF.dll Parsers.dll
+cp ../ebnf/sample.txt input.txt
+mono executor.exe Hime.Grams.EBNFParser outputs
+echo "OK"
+
+# Testing Hime
+echo -n "Testing grammar: Hime ... "
+mono himecc.exe ../hime/Hime.gram -o:assembly -a:public -n Hime.Grams >/dev/null
+mv Hime.dll Parsers.dll
+cp ../hime/Hime.gram input.txt
+mono executor.exe Hime.Grams.HimeParser outputs
+echo "OK"
+
+# Testing Javascript
+echo -n "Testing grammar: Javascript ... "
+mono himecc.exe ../javascript/Javascript.gram -o:assembly -a:public -n Hime.Grams >/dev/null
+mv Javascript.dll Parsers.dll
+cp ../javascript/sample.js input.txt
+mono executor.exe Hime.Grams.JavascriptParser outputs
 echo "OK"
 
 # Testing JSON-LD
@@ -101,20 +109,36 @@ cp ../ntriples/sample.nt input.txt
 mono executor.exe Hime.Grams.NTriplesParser outputs
 echo "OK"
 
-# Testing Turtle
-echo -n "Testing grammar: Turtle ... "
-mono himecc.exe ../turtle/Turtle.gram -o:assembly -a:public -n Hime.Grams >/dev/null
-mv Turtle.dll Parsers.dll
-cp ../turtle/sample.ttl input.txt
-mono executor.exe Hime.Grams.TurtleParser outputs
-echo "OK"
-
 # Testing Functional OWL2
 echo -n "Testing grammar: Functional OWL2 ... "
 mono himecc.exe ../owl/FunctionalOWL2.gram -o:assembly -a:public -n Hime.Grams >/dev/null
 mv FunctionalOWL2.dll Parsers.dll
 cp ../owl/sample.fs input.txt
 mono executor.exe Hime.Grams.FunctionalOWL2Parser outputs
+echo "OK"
+
+# Testing SPARQL
+echo -n "Testing grammar: SPARQL ... "
+mono himecc.exe ../sparql/SPARQL.gram -o:assembly -a:public -n Hime.Grams >/dev/null
+mv SPARQL.dll Parsers.dll
+cp ../sparql/sample.sparql input.txt
+mono executor.exe Hime.Grams.SPARQLParser outputs
+echo "OK"
+
+# Testing TriG
+echo -n "Testing grammar: TriG ... "
+mono himecc.exe ../trig/TriG.gram -o:assembly -a:public -n Hime.Grams >/dev/null
+mv TriG.dll Parsers.dll
+cp ../trig/sample.trig input.txt
+mono executor.exe Hime.Grams.TriGParser outputs
+echo "OK"
+
+# Testing Turtle
+echo -n "Testing grammar: Turtle ... "
+mono himecc.exe ../turtle/Turtle.gram -o:assembly -a:public -n Hime.Grams >/dev/null
+mv Turtle.dll Parsers.dll
+cp ../turtle/sample.ttl input.txt
+mono executor.exe Hime.Grams.TurtleParser outputs
 echo "OK"
 
 # Cleanup

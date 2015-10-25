@@ -18,11 +18,11 @@
  *     Laurent Wouters - lwouters@xowl.org
  **********************************************************************/
 
-grammar Turtle
+grammar TriG
 {
 	options
 	{
-		Axiom = "turtleDoc";
+		Axiom = "document";
 		Separator = "BLANK";
 	}
 	terminals
@@ -101,12 +101,17 @@ grammar Turtle
 		
 		PREFIX		-> [Pp] [Rr] [Ee] [Ff] [Ii] [Xx] ;
 		BASE		-> [Bb] [Aa] [Ss] [Ee] ;
+		GRAPH		-> [Gg] [Rr] [Aa] [Pp] [Hh] ;
 	}
 	rules
 	{
-		turtleDoc				-> 	statement* ;
-		statement				-> 	directive^ | triples^ '.'! ;
-		
+		document				-> 	(directive | statement)* ;
+		statement				-> triples^ '.'!
+								|  graphAnonymous^
+								|  graphNamed^ ;
+		graphAnonymous			-> '{'! (triples ('.'! triples)* ('.'!)?)? '}'! ;
+		graphNamed				-> (GRAPH!)? (iri | blankNode) graphAnonymous ;
+
 		directive				-> 	prefixID^ | base^ | sparqlPrefix^ | sparqlBase^ ;
 		prefixID				-> 	'@prefix'! PNAME_NS IRIREF '.'! ;
 		base					-> 	'@base'! IRIREF '.'! ;

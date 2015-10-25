@@ -1,22 +1,22 @@
 /**********************************************************************
-* Copyright (c) 2014 Laurent Wouters and others
-* This program is free software: you can redistribute it and/or modify
-* it under the terms of the GNU Lesser General Public License as
-* published by the Free Software Foundation, either version 3
-* of the License, or (at your option) any later version.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
-*
-* You should have received a copy of the GNU Lesser General
-* Public License along with this program.
-* If not, see <http://www.gnu.org/licenses/>.
-*
-* Contributors:
-*     Laurent Wouters - lwouters@xowl.org
-**********************************************************************/
+ * Copyright (c) 2015 Laurent Wouters and others
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General
+ * Public License along with this program.
+ * If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Contributors:
+ *     Laurent Wouters - lwouters@xowl.org
+ **********************************************************************/
 
 grammar NQuads
 {
@@ -51,12 +51,12 @@ grammar NQuads
 									| '\\U' [a-fA-F0-9]{8}
 								)* '"' ;
 		
-		PN_CHARS_BASE			-> [A-Za-z] | U+00C0 .. U+00D6 | U+00D8 .. U+00F6 | U+00F8 .. U+02FF | U+0370 .. U+037D
-        											| U+037F .. U+1FFF | U+200C .. U+200D | U+2070 .. U+218F | U+2C00 .. U+2FEF
-        											| U+3001 .. U+D7FF | U+F900 .. U+FDCF | U+FDF0 .. U+FFFD
-        											| U+10000 .. U+EFFFF ;
-		PN_CHARS_U				-> PN_CHARS_BASE | '_' | ':' ;
-		PN_CHARS				-> PN_CHARS_U | '-' | [0-9] | U+00B7 | U+0300 .. U+036F | U+203F .. U+2040;
+		fragment PN_CHARS_BASE	-> [A-Za-z] | U+00C0 .. U+00D6 | U+00D8 .. U+00F6 | U+00F8 .. U+02FF | U+0370 .. U+037D
+													| U+037F .. U+1FFF | U+200C .. U+200D | U+2070 .. U+218F | U+2C00 .. U+2FEF
+													| U+3001 .. U+D7FF | U+F900 .. U+FDCF | U+FDF0 .. U+FFFD
+													| U+10000 .. U+EFFFF ;
+		fragment PN_CHARS_U		-> PN_CHARS_BASE | '_' ;
+		fragment PN_CHARS		-> PN_CHARS_U | '-' | [0-9] | U+00B7 | U+0300 .. U+036F | U+203F .. U+2040;
 		BLANK_NODE_LABEL		-> '_:' (PN_CHARS_U | [0-9]) ((PN_CHARS | '.')* PN_CHARS)? ;
 	}
 	rules
