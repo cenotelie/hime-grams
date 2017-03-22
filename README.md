@@ -1,6 +1,6 @@
 # README #
 
-This repository contains various grammars for the [Hime parser generator](https://bitbucket.org/laurentw/hime).
+This repository contains various grammars for the [Hime parser generator](https://bitbucket.org/cenotelie/hime).
 Unless otherwise specified, the license for the grammars is LGPL.
 
 ### Self-test ###
@@ -13,12 +13,12 @@ A local mono installation is required with mono and xbuild in the path.
 
 The simplest way to contribute is to:
 
-* Fork this repository on [Bitbucket](https://bitbucket.org/laurentw/hime-grams).
+* Fork this repository on [Bitbucket](https://bitbucket.org/cenotelie/hime-grams).
 * Fix some issue or add a new grammar.
 * In the case of a new grammar, include the license and a sample input; edit the `build.sh` to include it in the self-test.
 * Create a merge request on Bitbucket.
 
 Email contacts:
 
-* [laurentw on Bitbucket](https://bitbucket.org/laurentw): lwouters at xowl dot org.
+* [laurentw on Bitbucket](https://bitbucket.org/laurentw): lwouters at cenotelie dot fr.
 

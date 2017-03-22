@@ -10,7 +10,7 @@ cd $DIRECTORY
 if [ ! -d "hime" ]; then
   # repo does not exist => clone
   echo "Cloning hime ..."
-  hg clone https://bitbucket.org/laurentw/hime >/dev/null
+  hg clone https://bitbucket.org/cenotelie/hime >/dev/null
   cd hime
 else
   # the repo exists => pull changes and clean
