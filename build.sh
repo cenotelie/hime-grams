@@ -72,7 +72,7 @@ echo "OK"
 # Testing Hime
 echo -n "Testing grammar: Hime ... "
 mono himecc.exe ../hime/Hime.gram -o:assembly -a:public -n Hime.Grams >/dev/null
-mv Hime.dll Parsers.dll
+mv HimeGrammar.dll Parsers.dll
 cp ../hime/Hime.gram input.txt
 mono executor.exe Hime.Grams.HimeParser outputs
 echo "OK"
