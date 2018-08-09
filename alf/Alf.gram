@@ -40,7 +40,7 @@ grammar Alf
 		WHITE_SPACE		-> uc{Zs} | U+0009 | U+000B | U+000C ;
 
 		// 7.5 Comments
-		COMMENT_LINE	-> '//' (.* - (.* NEW_LINE .*)) NEW_LINE ;
+		COMMENT_LINE	-> '//' (.* - (.* NEW_LINE .*)) ;
 		COMMENT_BLOCK	-> '/*' (.* - (.* '*/' .*)) '*/' ;
 		SEPARATOR		-> NEW_LINE | WHITE_SPACE | COMMENT_LINE | COMMENT_BLOCK;
 
